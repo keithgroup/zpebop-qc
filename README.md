@@ -36,7 +36,7 @@ Currently, we have developed ZPEBOP-1 and ZPEBOP-2 models, and each of these mod
 
 ## Usage
 
-Execute `zpebop1` and `zpebop2' for ZPEBOP-1 and ZPEBOP-2, respectively. Run this in the command line:
+Execute `zpebop1` and `zpebop2` for ZPEBOP-1 and ZPEBOP-2, respectively. Run this in the command line:
 
 ##### ZPEBOP-1:
 
