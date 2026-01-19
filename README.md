@@ -9,9 +9,9 @@ ZPEBOP is a high-performance Python package for computing molecular zero-point v
 
 ## Available Models
 
-| Model | Description | Terms |
+| Model | Description | Description |
 |-------|-------------|-------|
-| **ZPEBOP-1** | Harmonic approximation | $E = 2\beta\|P\|$ |
+| **ZPEBOP-1** | Harmonic approximation | Harmonic |
 | **ZPEBOP-2** | Full model (default) | Harmonic + Anharmonic + Three-body |
 
 ## Features
