@@ -11,7 +11,7 @@ ZPEBOP is a high-performance Python package for computing molecular zero-point v
 
 | Model | Description | Terms |
 |-------|-------------|-------|
-| **ZPEBOP-1** | Harmonic approximation | E = 2 * β * \|P\| |
+| **ZPEBOP-1** | Harmonic approximation | $E = 2\beta\|P\|$ |
 | **ZPEBOP-2** | Full model (default) | Harmonic + Anharmonic + Three-body |
 
 ## Features
@@ -21,7 +21,7 @@ ZPEBOP is a high-performance Python package for computing molecular zero-point v
 - **Isotope corrections**: Compute kinetic isotope effects on ZPE
 - **Bond-resolved analysis**: Decompose ZPE into individual bond contributions
 - **High performance**: Vectorized NumPy operations with pre-computed parameters
-- **Self-contained**: All parameters bundled—no external files needed
+- **Self-contained**: All parameters bundled - no external files needed
 - **Command-line interface**: Quick calculations from the terminal
 
 ## Installation
@@ -34,8 +34,8 @@ pip install -e .
 
 ### Dependencies
 
-- Python ≥ 3.7
-- NumPy ≥ 1.20.0
+- Python >= 3.7
+- NumPy >= 1.20.0
 
 ## Quick Start
 
@@ -85,11 +85,9 @@ zpebop -f molecule.out --be --sort --json
 ZPEBOP supports isotope effect calculations for studying kinetic isotope effects (KIE).
 The correction uses the harmonic oscillator approximation:
 
-```
-BE_isotope = BE_normal × √(μ_normal / μ_isotope)
-```
+$$BE_{\text{isotope}} = BE_{\text{normal}} \times \sqrt{\frac{\mu_{\text{normal}}}{\mu_{\text{isotope}}}}$$
 
-where μ = m₁×m₂/(m₁+m₂) is the reduced mass.
+where $\mu = \frac{m_1 \times m_2}{m_1 + m_2}$ is the reduced mass.
 
 ### Python API
 
@@ -110,7 +108,7 @@ result = calc.compute_zpe_isotope(isotopes)
 # Access results
 print(f"Normal ZPE:  {result.total_zpe_normal:.3f} kcal/mol")
 print(f"Isotope ZPE: {result.total_zpe:.3f} kcal/mol")
-print(f"ΔZPE:        {result.zpe_difference:.3f} kcal/mol")
+print(f"Delta ZPE:   {result.zpe_difference:.3f} kcal/mol")
 print(f"Ratio:       {result.zpe_ratio:.6f}")
 
 # Get isotope-corrected bond energies
@@ -156,7 +154,7 @@ zpebop -f molecule.out --isotope 1:2.014102 --json
   ZERO-POINT ENERGY COMPARISON:
     Normal ZPE (0 K)   =     64.044 KCAL/MOL
     Isotope ZPE (0 K)  =     62.293 KCAL/MOL
-    ΔZPE (Normal - Iso)=      1.752 KCAL/MOL
+    Delta ZPE          =      1.752 KCAL/MOL
     Ratio (Iso/Normal) =     0.972651
 ```
 
@@ -182,7 +180,6 @@ With the `--compare` flag, comparison tables show all bonds involving the isotop
    H7*-H12      0.000        0.000        0.8661    
    H7*-H13      0.000        0.000        1.0000    
    ----------------------------------------------
-```
    TOTAL        64.044       62.293       0.9727    
 ```
 
@@ -260,11 +257,11 @@ result.model          # 'zpebop1' or 'zpebop2'
 ```python
 result.total_zpe          # Isotope-corrected total ZPE
 result.total_zpe_normal   # Normal (uncorrected) total ZPE
-result.zpe_difference     # Normal - Isotope (ΔZPE)
+result.zpe_difference     # Normal - Isotope (Delta ZPE)
 result.zpe_ratio          # Isotope/Normal ratio
 result.two_body           # Isotope-corrected two-body matrix
 result.two_body_normal    # Normal two-body matrix
-result.correction_factors # Matrix of √(μ₁/μ₂) factors
+result.correction_factors # Matrix of correction factors
 result.isotopes           # Dict of {atom_num: mass}
 ```
 
