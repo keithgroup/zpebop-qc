@@ -194,31 +194,6 @@ ZPEBOP requires Gaussian output from ROHF/CBSB3 calculations with population ana
 # ROHF/CBSB3 Pop=(Full) IOp(6/27=122)
 ```
 
-## Theory
-
-### ZPEBOP-1: Harmonic Model
-
-```
-E(A-B) = 2 * β_AB * |P_AB|
-```
-
-Simple and fast, uses only Mulliken bond orders.
-
-### ZPEBOP-2: Full Model
-
-```
-E_total = E_harmonic + E_anharmonic + E_three-body
-```
-
-Where:
-- **Harmonic**: `E_harm = 2 * β * |P|` (with bonding/antibonding distinction)
-- **Anharmonic**: `E_anharm = A * exp(-ζ * (R - R₀))`
-- **Three-body**: `E_3body = Π(κ) * Π(2|P|) * Π(cos)`
-
-ZPEBOP-2 provides:
-- **Gross energy**: Harmonic + Anharmonic (two-body only)
-- **Net energy**: Gross + Three-body
-
 ## Output Format
 
 ### ZPEBOP-1 Output
@@ -332,10 +307,3 @@ If you use ZPEBOP in your research, please cite:
 ## License
 
 MIT License - see [LICENSE](LICENSE) for details.
-
-## Contact
-
-- **Author**: Barbaro Zulueta
-- **Email**: blz11@pitt.edu
-- **Institution**: University of Pittsburgh
-- **Group**: [Keith Research Group](https://www.engineering.pitt.edu/JohnKeith/)
