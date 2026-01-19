@@ -1,104 +1,341 @@
 # ZPEBOP
 
-The zero-point energy from bond orders and populations (ZPEBOP) program is a computational chemistry algorithm that computes accurate zero-point vibrational energies with anharmonic effects at equilibrium and vibrational bond energies using well-conditioned Hartree-Fock or B3LYP orbital populations and bond orders from approximate quantum chemistry methods. Moreover, these methods do not require Hessians or higher-order derivatives. 
+**Zero-Point Energies from Bond Orders and Populations**
+
+[![Python 3.7+](https://img.shields.io/badge/python-3.7+-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+ZPEBOP is a high-performance Python package for computing molecular zero-point vibrational energies (ZPE) from Mulliken bond orders obtained from ROHF calculations.
+
+## Available Models
+
+| Model | Description | Terms |
+|-------|-------------|-------|
+| **ZPEBOP-1** | Harmonic approximation | E = 2 * β * \|P\| |
+| **ZPEBOP-2** | Full model (default) | Harmonic + Anharmonic + Three-body |
+
+## Features
+
+- **Multiple models**: Choose between ZPEBOP-1 (fast) and ZPEBOP-2 (accurate)
+- **Unified interface**: Same API for all models
+- **Isotope corrections**: Compute kinetic isotope effects on ZPE
+- **Bond-resolved analysis**: Decompose ZPE into individual bond contributions
+- **High performance**: Vectorized NumPy operations with pre-computed parameters
+- **Self-contained**: All parameters bundled—no external files needed
+- **Command-line interface**: Quick calculations from the terminal
 
 ## Installation
 
 ```bash
-git clone https://github.com/keithgroup/zpebop-qc
-cd zpebop-qc
-pip install .
+git clone https://github.com/keithgroup/zpebop-qc.git
+cd zpebop-qc/zpebop
+pip install -e .
 ```
 
-## Preparing ZPEBOP Input Files
+### Dependencies
 
-Currently, we have developed ZPEBOP-1 and ZPEBOP-2 models, and each of these models require output from the MinPop algorithm. Below is an example of how to do this in Gaussian 16 for each model.
+- Python ≥ 3.7
+- NumPy ≥ 1.20.0
 
-1. Optimize your molecular structure using your preferred level of theory (e.g., B3LYP/CBSB7 and B3LYP/cc-pVTZ+1d).
+## Quick Start
 
-##### ZPEBOP-1:
+### Python API
 
-    # Opt B3LYP/CBSB7
+```python
+from zpebop import ZPECalculator
 
-##### ZPEBOP-2:
+# Use ZPEBOP-2 (default, most accurate)
+calc = ZPECalculator("molecule.out")
+result = calc.compute_zpe()
+print(f"ZPE = {result.total_zpe:.3f} kcal/mol")
 
-    # Opt B3LYP/cc-pVTZ+1d
+# Use ZPEBOP-1 (harmonic only)
+calc = ZPECalculator("molecule.out", model="zpebop1")
+result = calc.compute_zpe()
+print(f"ZPE = {result.total_zpe:.3f} kcal/mol")
 
-2. Run Hartree-Fock or B3LYP on the optimized structure in Gaussian.
+# Get bond energies
+bond_energies = calc.compute_bond_energies()
+print(f"Total: {bond_energies.gross.sum():.3f} kcal/mol")
 
-##### ZPEBOP-1:
+# Sort bonds by energy
+labels, energies = calc.sort_bond_energies(bond_energies.gross)
+for label, e in zip(labels[-5:], energies[-5:]):
+    print(f"{label}: {e:.2f} kcal/mol")
+```
 
-    # SP B3LYP/CBSB3 Pop=(Full) IOp(6/27=122,6/12=3)
-    
-##### ZPEBOP-2:
-
-    # SP ROHF/CBSB3 Pop=(Full) IOp(6/27=122,6/12=3)
-
-## Usage
-
-Execute `zpebop1` and `zpebop2` for ZPEBOP-1 and ZPEBOP-2, respectively. Run this in the command line:
-
-##### ZPEBOP-1:
+### Command Line
 
 ```bash
-zpebop1 -f {name_file} --be --sort --json > {name_file}.bop
+# Use ZPEBOP-2 (default)
+zpebop -f molecule.out
+
+# Use ZPEBOP-1
+zpebop -f molecule.out --model zpebop1
+
+# With bond energy tables
+zpebop -f molecule.out --be
+
+# With sorted bonds and JSON output
+zpebop -f molecule.out --be --sort --json
 ```
 
-##### ZPEBOP-2
+## Isotope Corrections
+
+ZPEBOP supports isotope effect calculations for studying kinetic isotope effects (KIE).
+The correction uses the harmonic oscillator approximation:
+
+```
+BE_isotope = BE_normal × √(μ_normal / μ_isotope)
+```
+
+where μ = m₁×m₂/(m₁+m₂) is the reduced mass.
+
+### Python API
+
+```python
+from zpebop import ZPECalculator
+
+calc = ZPECalculator("molecule.out")
+
+# Define isotopes: atom_number (1-indexed) -> mass (amu)
+isotopes = {
+    1: 2.014102,   # Atom 1 is deuterium (D)
+    7: 13.00335,   # Atom 7 is carbon-13
+}
+
+# Compute with isotope corrections
+result = calc.compute_zpe_isotope(isotopes)
+
+# Access results
+print(f"Normal ZPE:  {result.total_zpe_normal:.3f} kcal/mol")
+print(f"Isotope ZPE: {result.total_zpe:.3f} kcal/mol")
+print(f"ΔZPE:        {result.zpe_difference:.3f} kcal/mol")
+print(f"Ratio:       {result.zpe_ratio:.6f}")
+
+# Get isotope-corrected bond energies
+normal_be, isotope_be = calc.compute_bond_energies_isotope(isotopes)
+```
+
+### Command Line
 
 ```bash
-zpebop2 -f {name_file} -param_folder {param_folder} --be --sort --json > {name_file}.bop
+# Single isotope substitution (deuterium at atom 1)
+zpebop -f molecule.out --isotope 1:2.014102
+
+# Multiple isotope substitutions
+zpebop -f molecule.out --isotope 1:2.014102 --isotope 7:13.00335
+
+# With bond energy tables (asterisks mark substituted atoms)
+zpebop -f molecule.out --isotope 1:2.014102 --be
+
+# With isotope comparison tables (normal vs isotope)
+zpebop -f molecule.out --isotope 1:2.014102 --be --compare
+
+# With JSON output
+zpebop -f molecule.out --isotope 1:2.014102 --json
 ```
 
-where `{name_file}` is the Hartree-Fock or B3LYP MinPop output file and `{param_folder}` is the name or path of the ZPEBOP-2 parameter folder. Note that ZPEBOP-2 parameters are stored in json files under the `opt_parameters` folders.
+### Common Isotope Masses
 
-Some examples of ZPEBOP-1 and ZPEBOP-2 output files are found in the `examples` directory.
+| Isotope | Mass (amu) | Usage |
+|---------|------------|-------|
+| Deuterium (D) | 2.014102 | `--isotope N:2.014102` |
+| Tritium (T) | 3.016049 | `--isotope N:3.016049` |
+| Carbon-13 | 13.00335 | `--isotope N:13.00335` |
+| Carbon-14 | 14.00324 | `--isotope N:14.00324` |
+| Nitrogen-15 | 15.00011 | `--isotope N:15.00011` |
+| Oxygen-18 | 17.99916 | `--isotope N:17.99916` |
 
-Some details of the parsers used in `zpebop1` and `zpebop2` source codes.
+### Isotope Output Format
 
-##### ZPEBOP-1:
+```
+   ISOTOPE SUBSTITUTIONS:
+     D1: 2.014102 amu
 
-```bash
-$ zpebop1 -h
-usage: zpebop1 [-h] -f F [--be] [--sort] [--json]
-
-compute ZPE and bond energies (i.e., gross and net)
-
-optional arguments:
-  -h, --help  show this help message and exit
-  -f F        name of the Gaussian B3LYP output file
-  --be        compute ZPEBOP vibrational bond energies (net and gross bond energies)
-  --sort      sort the net ZPEBOP bond energies (from lowest to highest in energy)
-  --json      save the job output into JSON
+  ZERO-POINT ENERGY COMPARISON:
+    Normal ZPE (0 K)   =     64.044 KCAL/MOL
+    Isotope ZPE (0 K)  =     62.293 KCAL/MOL
+    ΔZPE (Normal - Iso)=      1.752 KCAL/MOL
+    Ratio (Iso/Normal) =     0.972651
 ```
 
-##### ZPEBOP-2:
+### Isotope Comparison Tables (--compare)
 
-```bash
-$ zpebop2 -h
-zpebop2 [-h] -f F [-param_folder PARAM_FOLDER] [--be] [--sort] [--json]
+With the `--compare` flag, comparison tables show all bonds involving the isotope-substituted atom:
 
-compute ZPE and bond energies (i.e., gross and net)
+```
+   NET VIBRATIONAL BOND ENERGIES (ISOTOPE COMPARISON)
 
-optional arguments:
-  -h, --help            show this help message and exit
-  -f F                  name of the Gaussian Hartree-Fock output file
-  -param_folder PARAM_FOLDER
-                        name of ZPEBOP-2's parameter path/folder (default: opt_parameters)
-  --be                  compute ZPEBOP vibrational bond energies (net and gross bond energies)
-  --sort                sort the net ZPEBOP bond energies (from lowest to highest in energy)
-  --json                save the job output into JSON
+   Bond         Normal       Isotope      Ratio     
+   ----------------------------------------------
+   C1-H7*       5.067        3.720        0.7342    
+   C2-H7*       0.285        0.209        0.7342    
+   O3-H7*       0.002        0.001        0.7280    
+   C4-H7*       0.010        0.007        0.7342    
+   C5-H7*       0.000        0.000        0.7342    
+   H6-H7*       0.003        0.003        0.8661    
+   H7*-H8       0.368        0.319        0.8661    
+   H7*-H9       0.059        0.051        0.8661    
+   H7*-H10      0.001        0.000        0.8661    
+   H7*-H11      0.000        0.000        0.8661    
+   H7*-H12      0.000        0.000        0.8661    
+   H7*-H13      0.000        0.000        1.0000    
+   ----------------------------------------------
+```
+   TOTAL        64.044       62.293       0.9727    
 ```
 
-## Citations
+## Gaussian Input Requirements
 
-Please cite:
+ZPEBOP requires Gaussian output from ROHF/CBSB3 calculations with population analysis:
 
-**ZPEBOP-1**: Jesse Albert Mangiardi. *Zero-Point Energies from Bond Orders*. Undergraduate thesis, Wesleyan University, Middletown, CT, 2015.
+```
+# ROHF/CBSB3 Pop=(Full) IOp(6/27=122)
+```
 
-**ZPEBOP-2**:  Barbaro Zulueta, Colin D. Rude, Jesse A. Mangiardi, George A. Petersson, and John A. Keith. A Zero-Point Energies from Bond Orders and Populations Relationship. (in preparation), 2024.
+## Theory
+
+### ZPEBOP-1: Harmonic Model
+
+```
+E(A-B) = 2 * β_AB * |P_AB|
+```
+
+Simple and fast, uses only Mulliken bond orders.
+
+### ZPEBOP-2: Full Model
+
+```
+E_total = E_harmonic + E_anharmonic + E_three-body
+```
+
+Where:
+- **Harmonic**: `E_harm = 2 * β * |P|` (with bonding/antibonding distinction)
+- **Anharmonic**: `E_anharm = A * exp(-ζ * (R - R₀))`
+- **Three-body**: `E_3body = Π(κ) * Π(2|P|) * Π(cos)`
+
+ZPEBOP-2 provides:
+- **Gross energy**: Harmonic + Anharmonic (two-body only)
+- **Net energy**: Gross + Three-body
+
+## Output Format
+
+### ZPEBOP-1 Output
+
+```
+                    SUMMARY OF ZPE-BOP CALCULATION
+
+                        ZPE-BOP (Version 1.0.0)
+                       17-January-2026 12:00:00
+
+
+   MINPOP OUTPUT:  /path/to/molecule.out
+
+  ZERO-POINT ENERGY (0 K)  =     63.801 KCAL/MOL
+```
+
+### ZPEBOP-2 Output
+
+```
+                    SUMMARY OF ZPE-BOP CALCULATION
+
+                        ZPE-BOP (Version 2.0.0)
+                       17-January-2026 12:00:00
+
+
+   MINPOP OUTPUT:  /path/to/molecule.out
+
+  ZERO-POINT ENERGY (0 K)  =     64.044 KCAL/MOL
+```
+
+## API Reference
+
+### ZPECalculator
+
+```python
+from zpebop import ZPECalculator
+
+# Initialize with model selection
+calc = ZPECalculator(source, model='zpebop2')
+
+# Available methods
+result = calc.compute_zpe()           # Returns ZPEResult
+energies = calc.compute_bond_energies()  # Returns BondEnergies
+labels, values = calc.sort_bond_energies(matrix)
+
+# Isotope methods
+iso_result = calc.compute_zpe_isotope(isotopes)  # Returns IsotopeZPEResult
+normal_be, iso_be = calc.compute_bond_energies_isotope(isotopes)
+```
+
+### ZPEResult
+
+```python
+result.total_zpe      # Total ZPE in kcal/mol
+result.two_body       # Two-body contributions matrix
+result.three_body_decomp  # Three-body decomposed to pairs
+result.gross          # Alias for two_body
+result.net            # two_body + three_body_decomp
+result.model          # 'zpebop1' or 'zpebop2'
+```
+
+### IsotopeZPEResult
+
+```python
+result.total_zpe          # Isotope-corrected total ZPE
+result.total_zpe_normal   # Normal (uncorrected) total ZPE
+result.zpe_difference     # Normal - Isotope (ΔZPE)
+result.zpe_ratio          # Isotope/Normal ratio
+result.two_body           # Isotope-corrected two-body matrix
+result.two_body_normal    # Normal two-body matrix
+result.correction_factors # Matrix of √(μ₁/μ₂) factors
+result.isotopes           # Dict of {atom_num: mass}
+```
+
+### BondEnergies
+
+```python
+energies.gross        # Gross (two-body) matrix
+energies.net          # Net (with three-body) matrix
+energies.composite    # Combined table
+```
+
+## Supported Elements
+
+| Period | Elements |
+|--------|----------|
+| 1 | H |
+| 2 | Li, Be, B, C, N, O, F |
+| 3 | Na, Cl |
+
+Three-body terms (ZPEBOP-2) are available for B, C, N, O pairs.
+
+## Citation
+
+If you use ZPEBOP in your research, please cite:
+
+```bibtex
+@article{zulueta2025zpebop,
+  title={Zero-point energies from bond orders and populations relationships},
+  author={Zulueta, Barbaro and Rude, Colin D. and Mangiardi, Jesse A. and 
+          Petersson, George A. and Keith, John A.},
+  journal={The Journal of Chemical Physics},
+  volume={162},
+  number={8},
+  pages={084102},
+  year={2025},
+  doi={10.1063/5.0238831}
+}
+```
 
 ## License
 
-Distributed under the MIT License.
-See `LICENSE` for more information.
+MIT License - see [LICENSE](LICENSE) for details.
+
+## Contact
+
+- **Author**: Barbaro Zulueta
+- **Email**: blz11@pitt.edu
+- **Institution**: University of Pittsburgh
+- **Group**: [Keith Research Group](https://www.engineering.pitt.edu/JohnKeith/)
