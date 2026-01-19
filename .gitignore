@@ -1,2 +1,17 @@
 .DS_Store
 **/.DS_Store
+
+# macOS
+.DS_Store
+**/.DS_Store
+
+# Python
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+
+# Jupyter
+.ipynb_checkpoints/
+**/.ipynb_checkpoints/
