@@ -180,7 +180,6 @@ With the `--compare` flag, comparison tables show all bonds involving the isotop
    H7*-H12      0.000        0.000        0.8661    
    H7*-H13      0.000        0.000        1.0000    
    ----------------------------------------------
-   TOTAL        64.044       62.293       0.9727    
 ```
 
 ## Gaussian Input Requirements
