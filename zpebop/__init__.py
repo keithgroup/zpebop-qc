@@ -69,7 +69,7 @@ __email__ = 'blz11@pitt.edu'
 from .core import ZPECalculator
 
 # Data classes
-from .models.base import ZPEResult, BondEnergies, IsotopeZPEResult
+from .models.base import ZPEResult, BondEnergies
 
 # Parser
 from .parser import MolecularData, parse_gaussian_output
@@ -81,8 +81,6 @@ from .constants import (
     SUPPORTED_ELEMENTS,
     ELEMENT_TO_INDEX,
     N_ELEMENTS,
-    ATOMIC_MASSES,
-    COMMON_ISOTOPES,
 )
 
 # Public API
@@ -97,7 +95,6 @@ __all__ = [
     # Data classes
     'ZPEResult',
     'BondEnergies',
-    'IsotopeZPEResult',
     
     # Parser
     'MolecularData',
@@ -109,8 +106,6 @@ __all__ = [
     'SUPPORTED_ELEMENTS',
     'ELEMENT_TO_INDEX',
     'N_ELEMENTS',
-    'ATOMIC_MASSES',
-    'COMMON_ISOTOPES',
 ]
 
 

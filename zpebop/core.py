@@ -37,18 +37,15 @@ Examples
 >>> # Use ZPEBOP-1
 >>> calc = ZPECalculator("molecule.out", model="zpebop1")
 >>> result = calc.compute_zpe()
->>>
->>> # With isotope correction (deuterium at atom 1)
->>> result_iso = calc.compute_zpe_isotope({1: 2.014102})
 """
 
 from pathlib import Path
-from typing import Tuple, Union, Dict, Optional
+from typing import Tuple, Union
 import numpy as np
 
-from .constants import ELEMENT_TO_INDEX, ATOMIC_MASSES
+from .constants import ELEMENT_TO_INDEX
 from .parser import MolecularData, parse_gaussian_output
-from .models.base import ZPEResult, BondEnergies, IsotopeZPEResult
+from .models.base import ZPEResult, BondEnergies
 from .models.zpebop1 import compute_zpe_v1
 from .models.zpebop2 import compute_zpe_v2
 
@@ -180,8 +177,7 @@ class ZPECalculator:
     def sort_bond_energies(self, bond_energy_matrix: np.ndarray,
                            relative: bool = False,
                            include_atom_numbers: bool = True,
-                           threshold: float = 0.01,
-                           isotopes: Dict[int, float] = None) -> Tuple[np.ndarray, np.ndarray]:
+                           threshold: float = 0.01) -> Tuple[np.ndarray, np.ndarray]:
         """
         Sort bond energies from weakest to strongest.
         
@@ -195,9 +191,6 @@ class ZPECalculator:
             If True, include atom indices in labels.
         threshold : float, optional
             Minimum energy to include.
-        isotopes : dict, optional
-            Mapping of atom number (1-indexed) to isotope mass.
-            Atoms with isotope substitutions will be marked with *.
         
         Returns
         -------
@@ -217,10 +210,7 @@ class ZPECalculator:
                     continue
                 
                 if include_atom_numbers:
-                    # Add asterisk for isotope-substituted atoms
-                    marker_j = '*' if isotopes and (j + 1) in isotopes else ''
-                    marker_i = '*' if isotopes and (i + 1) in isotopes else ''
-                    label = f"{self.atoms[j]}{j+1}{marker_j}-{self.atoms[i]}{i+1}{marker_i}"
+                    label = f"{self.atoms[j]}{j+1}-{self.atoms[i]}{i+1}"
                 else:
                     label = f"{self.atoms[j]}-{self.atoms[i]}"
                 
@@ -239,166 +229,3 @@ class ZPECalculator:
             energies = energies - energies[0]
         
         return labels, energies
-    
-    def _compute_isotope_correction_matrix(self, 
-                                            isotopes: Dict[int, float]) -> np.ndarray:
-        """
-        Compute matrix of isotope correction factors sqrt(μ_1/μ_2).
-        
-        Parameters
-        ----------
-        isotopes : dict
-            Mapping of atom number (1-indexed) to isotope mass.
-        
-        Returns
-        -------
-        np.ndarray
-            Matrix of correction factors (lower triangular).
-        """
-        n = self.n_atoms
-        correction = np.ones((n, n), dtype=np.float64)
-        
-        for i in range(1, n):
-            for j in range(i):
-                # Standard masses
-                m1_i = ATOMIC_MASSES[self.atoms[i]]
-                m1_j = ATOMIC_MASSES[self.atoms[j]]
-                mu_1 = (m1_i * m1_j) / (m1_i + m1_j)
-                
-                # Isotope masses (use standard if not specified)
-                # Note: isotopes dict uses 1-indexed atom numbers
-                m2_i = isotopes.get(i + 1, m1_i)
-                m2_j = isotopes.get(j + 1, m1_j)
-                mu_2 = (m2_i * m2_j) / (m2_i + m2_j)
-                
-                # Correction factor: sqrt(μ_1/μ_2)
-                correction[i, j] = np.sqrt(mu_1 / mu_2)
-        
-        return correction
-    
-    def compute_zpe_isotope(self, isotopes: Dict[int, float]) -> IsotopeZPEResult:
-        """
-        Compute ZPE with isotope mass corrections.
-        
-        Uses the harmonic oscillator approximation:
-            BE_isotope = BE_normal * sqrt(μ_normal / μ_isotope)
-        
-        where μ = m₁*m₂/(m₁+m₂) is the reduced mass.
-        
-        Parameters
-        ----------
-        isotopes : dict
-            Mapping of atom number (1-indexed) to isotope mass.
-            Example: {1: 2.014102} for deuterium at atom 1.
-            
-            Common isotope masses:
-            - Deuterium (D): 2.014102
-            - Tritium (T): 3.016049
-            - Carbon-13: 13.00335
-            - Carbon-14: 14.00324
-            - Nitrogen-15: 15.00011
-            - Oxygen-18: 17.99916
-        
-        Returns
-        -------
-        IsotopeZPEResult
-            Result with isotope-corrected energies and comparison data.
-        
-        Examples
-        --------
-        >>> calc = ZPECalculator("molecule.out")
-        >>> # Replace H at atom 1 with deuterium
-        >>> result = calc.compute_zpe_isotope({1: 2.014102})
-        >>> print(f"Normal ZPE: {result.total_zpe_normal:.3f}")
-        >>> print(f"Isotope ZPE: {result.total_zpe:.3f}")
-        >>> print(f"ΔZPE: {result.zpe_difference:.3f}")
-        """
-        # Validate isotope atom numbers
-        for atom_num in isotopes:
-            if atom_num < 1 or atom_num > self.n_atoms:
-                raise ValueError(
-                    f"Invalid atom number {atom_num}. "
-                    f"Must be between 1 and {self.n_atoms}."
-                )
-        
-        # Compute normal ZPE first
-        normal_result = self.compute_zpe()
-        
-        # Compute correction factors
-        correction = self._compute_isotope_correction_matrix(isotopes)
-        
-        # Apply corrections to two-body terms
-        two_body_isotope = normal_result.two_body * correction
-        
-        # Apply corrections to three-body decomposition
-        three_body_isotope = normal_result.three_body_decomp * correction
-        
-        # Total isotope-corrected ZPE
-        total_zpe_isotope = np.sum(two_body_isotope) + np.sum(three_body_isotope)
-        
-        return IsotopeZPEResult(
-            total_zpe=total_zpe_isotope,
-            total_zpe_normal=normal_result.total_zpe,
-            two_body=two_body_isotope,
-            two_body_normal=normal_result.two_body,
-            three_body_decomp=three_body_isotope,
-            three_body_decomp_normal=normal_result.three_body_decomp,
-            correction_factors=correction,
-            atoms=self.atoms,
-            isotopes=isotopes,
-            model=self.model,
-            units='kcal/mol'
-        )
-    
-    def compute_bond_energies_isotope(self, 
-                                       isotopes: Dict[int, float]) -> Tuple[BondEnergies, BondEnergies]:
-        """
-        Compute vibrational bond energy tables with isotope corrections.
-        
-        Parameters
-        ----------
-        isotopes : dict
-            Mapping of atom number (1-indexed) to isotope mass.
-        
-        Returns
-        -------
-        normal_energies : BondEnergies
-            Bond energies without isotope correction.
-        isotope_energies : BondEnergies
-            Bond energies with isotope correction.
-        """
-        result = self.compute_zpe_isotope(isotopes)
-        
-        n = self.n_atoms
-        
-        # Normal bond energies
-        gross_normal = result.two_body_normal
-        net_normal = result.two_body_normal + result.three_body_decomp_normal
-        composite_normal = np.zeros((n, n), dtype=np.float64)
-        for i in range(1, n):
-            for j in range(i):
-                composite_normal[j, i] = gross_normal[i, j]
-                composite_normal[i, j] = net_normal[i, j]
-        
-        normal = BondEnergies(
-            gross=gross_normal, 
-            net=net_normal, 
-            composite=composite_normal
-        )
-        
-        # Isotope-corrected bond energies
-        gross_iso = result.two_body
-        net_iso = result.two_body + result.three_body_decomp
-        composite_iso = np.zeros((n, n), dtype=np.float64)
-        for i in range(1, n):
-            for j in range(i):
-                composite_iso[j, i] = gross_iso[i, j]
-                composite_iso[i, j] = net_iso[i, j]
-        
-        isotope = BondEnergies(
-            gross=gross_iso, 
-            net=net_iso, 
-            composite=composite_iso
-        )
-        
-        return normal, isotope

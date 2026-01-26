@@ -24,11 +24,11 @@
 Base classes and dataclasses shared by ZPEBOP models.
 """
 
-from dataclasses import dataclass, field
-from typing import Tuple, Dict, Optional
+from dataclasses import dataclass
+from typing import Dict
 import numpy as np
 
-__all__ = ['ZPEResult', 'BondEnergies', 'IsotopeZPEResult']
+__all__ = ['ZPEResult', 'BondEnergies']
 
 
 @dataclass
@@ -111,116 +111,3 @@ class ZPEResult:
     def three_body_sum(self) -> float:
         """Sum of three-body contributions."""
         return float(np.sum(self.three_body_decomp))
-
-
-@dataclass
-class IsotopeZPEResult:
-    """
-    Results from a ZPEBOP calculation with isotope corrections.
-    
-    The isotope correction uses the harmonic oscillator approximation:
-        BE_isotope = BE_normal * sqrt(μ_normal / μ_isotope)
-    
-    where μ = m₁*m₂/(m₁+m₂) is the reduced mass of the bond.
-    
-    Attributes
-    ----------
-    total_zpe : float
-        Total isotope-corrected zero-point vibrational energy.
-    total_zpe_normal : float
-        Total ZPE without isotope correction (for comparison).
-    two_body : np.ndarray
-        Isotope-corrected two-body contributions matrix.
-    two_body_normal : np.ndarray
-        Original two-body contributions (no isotope correction).
-    three_body_decomp : np.ndarray
-        Isotope-corrected three-body contributions.
-    three_body_decomp_normal : np.ndarray
-        Original three-body contributions.
-    correction_factors : np.ndarray
-        Matrix of sqrt(μ_normal/μ_isotope) correction factors.
-    atoms : np.ndarray
-        Array of atomic symbols.
-    isotopes : Dict[int, float]
-        Mapping of atom number (1-indexed) to isotope mass.
-    model : str
-        Model used ('zpebop1' or 'zpebop2').
-    units : str
-        Energy units ('kcal/mol').
-    """
-    total_zpe: float
-    total_zpe_normal: float
-    two_body: np.ndarray
-    two_body_normal: np.ndarray
-    three_body_decomp: np.ndarray
-    three_body_decomp_normal: np.ndarray
-    correction_factors: np.ndarray
-    atoms: np.ndarray
-    isotopes: Dict[int, float]
-    model: str
-    units: str = 'kcal/mol'
-    
-    @property
-    def n_atoms(self) -> int:
-        """Number of atoms in the molecule."""
-        return len(self.atoms)
-    
-    @property
-    def gross(self) -> np.ndarray:
-        """Isotope-corrected gross bond energies (two-body only)."""
-        return self.two_body
-    
-    @property
-    def gross_normal(self) -> np.ndarray:
-        """Original gross bond energies (no isotope correction)."""
-        return self.two_body_normal
-    
-    @property
-    def net(self) -> np.ndarray:
-        """Isotope-corrected net bond energies (two-body + three-body)."""
-        return self.two_body + self.three_body_decomp
-    
-    @property
-    def net_normal(self) -> np.ndarray:
-        """Original net bond energies (no isotope correction)."""
-        return self.two_body_normal + self.three_body_decomp_normal
-    
-    @property
-    def zpe_ratio(self) -> float:
-        """Ratio of isotope ZPE to normal ZPE."""
-        if self.total_zpe_normal > 0:
-            return self.total_zpe / self.total_zpe_normal
-        return 1.0
-    
-    @property
-    def zpe_difference(self) -> float:
-        """Difference between normal and isotope ZPE (normal - isotope)."""
-        return self.total_zpe_normal - self.total_zpe
-    
-    def get_isotope_label(self, atom_num: int) -> str:
-        """
-        Get a label for an atom showing isotope mass if substituted.
-        
-        Parameters
-        ----------
-        atom_num : int
-            Atom number (1-indexed).
-        
-        Returns
-        -------
-        str
-            Label like "C1" or "D1" or "C1(13.003)"
-        """
-        idx = atom_num - 1
-        symbol = self.atoms[idx]
-        
-        if atom_num in self.isotopes:
-            mass = self.isotopes[atom_num]
-            # Check for common isotope names
-            if symbol == 'H':
-                if abs(mass - 2.014) < 0.01:
-                    return f"D{atom_num}"
-                elif abs(mass - 3.016) < 0.01:
-                    return f"T{atom_num}"
-            return f"{symbol}{atom_num}({mass:.3f})"
-        return f"{symbol}{atom_num}"
